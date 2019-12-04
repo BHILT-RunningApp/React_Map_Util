@@ -35,7 +35,6 @@ class RoutingMachine extends MapLayer {
     }).addTo(map.current.leafletElement);
 
     leafletElement.hide(); // hide road describtion
-
     return leafletElement.getPlan();
   }
 }
