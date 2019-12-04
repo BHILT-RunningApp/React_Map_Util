@@ -1,6 +1,6 @@
 import React, { Component } from "react";
 
-import { Map, TileLayer } from "react-leaflet";
+import { Map, TileLayer, Rectangle } from "react-leaflet";
 
 import { getRoute } from "./api";
 import AddMarker from "./Marker";
@@ -12,6 +12,8 @@ import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
 import HeatmapLayer from "react-leaflet-heatmap-layer";
+
+const pollutionPoints = require("./pollution-points");
 
 class RouteMap extends Component {
   state = {
@@ -35,7 +37,7 @@ class RouteMap extends Component {
     blur: 8,
     max: 0.5,
     zoom: 14,
-    leafletElement: null
+    pollutionCoeff: 0.5
   };
 
   fetchRoute = (startCoordinates, endCoordinates, avoidAreas) => {
@@ -53,14 +55,18 @@ class RouteMap extends Component {
   componentDidMount = () => {
     if (this.state.avoidAreaToggle) {
       this.fetchRoute(
+        // "53.457915,-2.226825",
+        // "53.487144,-2.248454",
         "53.47,-2.24",
         "53.44,-2.26",
         `${this.state.rectangle[0][0]},${this.state.rectangle[0][1]};${this.state.rectangle[1][0]},${this.state.rectangle[1][1]}`
       );
     } else {
-      this.fetchRoute("53.47,-2.24", "53.44,-2.26");
+      this.fetchRoute("53.457915,-2.226825", "53.487144,-2.248454");
     }
   };
+
+  fetchAvoidString = () => {};
 
   componentDidUpdate = (prevProps, prevState) => {
     if (prevState.avoidAreaToggle !== this.state.avoidAreaToggle) {
@@ -76,9 +82,21 @@ class RouteMap extends Component {
     }
   };
 
-  road = [L.latLng(53.447967, -2.260778), L.latLng(53.443699, -2.25168)];
+  pollutionAreas = pollutionPoints.map(point => {
+    return [
+      [
+        point.pp_coordinates.lat + 0.003 * this.state.pollutionCoeff,
+        point.pp_coordinates.long - 0.005 * this.state.pollutionCoeff
+      ],
+      [
+        point.pp_coordinates.lat - 0.003 * this.state.pollutionCoeff,
+        point.pp_coordinates.long + 0.005 * this.state.pollutionCoeff
+      ]
+    ];
+  });
 
   map = React.createRef();
+
   defaultIcon = L.icon({
     iconUrl: icon,
     shadowUrl: iconShadow
@@ -101,24 +119,22 @@ class RouteMap extends Component {
 
   render() {
     let centerPosition = this.state.defaultCenter;
+    // const gradient = {
+    //   0.1: "#89BDE0",
+    //   0.2: "#96E3E6",
+    //   0.4: "#82CEB6",
+    //   0.6: "#FAF3A5",
+    //   0.8: "#F5D98B",
+    //   "1.0": "#DE9A96"
+    // };
 
-    const gradient = {
-      0.1: "#89BDE0",
-      0.2: "#96E3E6",
-      0.4: "#82CEB6",
-      0.6: "#FAF3A5",
-      0.8: "#F5D98B",
-      "1.0": "#DE9A96"
-    };
+    const gradient = { 0.1: "#f3f3f3", 0.5: "#11d3d3", 1: "#1eff00" };
 
-    const addressPoints = [
-      [
-        (this.state.rectangle[0][0] + this.state.rectangle[1][0]) / 2,
-        (this.state.rectangle[0][1] + this.state.rectangle[1][1]) / 2,
-        "3000"
-      ],
-      [0, 0, "0"]
-    ];
+    const addressPoints = pollutionPoints.map(point => {
+      return [point.pp_coordinates.lat, point.pp_coordinates.long, 3000];
+    });
+
+    // console.log("POLLUTION AREAS => ", this.pollutionAreas);
 
     return (
       !this.state.isLoading && (
@@ -130,18 +146,23 @@ class RouteMap extends Component {
             onZoom={this.handleZoom}
           >
             {this.state.avoidAreaToggle && (
-              <HeatmapLayer
-                // fitBoundsOnLoad
-                // fitBoundsOnUpdate
-                points={addressPoints}
-                longitudeExtractor={m => m[1]}
-                latitudeExtractor={m => m[0]}
-                gradient={gradient}
-                intensityExtractor={m => parseFloat(m[2])}
-                radius={this.state.radius}
-                blur={50}
-                max={5}
-              />
+              <>
+                <HeatmapLayer
+                  // fitBoundsOnLoad
+                  // fitBoundsOnUpdate
+                  points={addressPoints}
+                  longitudeExtractor={m => m[1]}
+                  latitudeExtractor={m => m[0]}
+                  gradient={gradient}
+                  intensityExtractor={m => parseFloat(m[2])}
+                  radius={this.state.radius}
+                  blur={50}
+                  max={5}
+                />
+                {this.pollutionAreas.map((area, index) => {
+                  return <Rectangle key={index} bounds={area} />;
+                })}
+              </>
             )}
             <TileLayer
               attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
@@ -152,6 +173,13 @@ class RouteMap extends Component {
               <div>
                 <AddMarker data={this.state.road} />
 
+                {/* <Rectangle
+                  bounds={[
+                    [53.447967, -2.260778],
+                    [53.443699, -2.25168]
+                  ]}
+                  color="red"
+                /> */}
                 <RoutingMachine
                   color="#000"
                   road={this.state.road}
