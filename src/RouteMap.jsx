@@ -18,8 +18,8 @@ const pollutionPoints = require("./pollution-points");
 class RouteMap extends Component {
   state = {
     defaultCenter: {
-      lat: 53.447967,
-      lng: -2.260778
+      lat: 53.457915,
+      lng: -2.226825
     },
     markers: [{ position: { latitude: 53.47, longitude: -2.24 } }],
     road: [
@@ -37,7 +37,38 @@ class RouteMap extends Component {
     blur: 8,
     max: 0.5,
     zoom: 14,
-    pollutionCoeff: 0.5
+    pollutionCoeff: 0.8,
+    startCoordinates: [53.457915, -2.226825],
+    endCoordinates: [53.487144, -2.248454]
+  };
+
+  defaultCenter = {
+    lat: (this.state.startCoordinates[0] + this.state.endCoordinates[0]) / 2,
+    lng: (this.state.startCoordinates[1] + this.state.endCoordinates[1]) / 2
+  };
+
+  pollutionAreas = pollutionPoints.map(point => {
+    return [
+      [
+        point.pp_coordinates.lat + 0.003 * this.state.pollutionCoeff,
+        point.pp_coordinates.long - 0.005 * this.state.pollutionCoeff
+      ],
+      [
+        point.pp_coordinates.lat - 0.003 * this.state.pollutionCoeff,
+        point.pp_coordinates.long + 0.005 * this.state.pollutionCoeff
+      ]
+    ];
+  });
+
+  fetchAvoidString = () => {
+    let avoidString = "";
+    this.pollutionAreas.forEach(area => {
+      avoidString =
+        avoidString +
+        `${area[0][0]},${area[0][1]};${area[1][0]},${area[1][1]}!`;
+    });
+
+    return avoidString.substring(0, avoidString.length - 1);
   };
 
   fetchRoute = (startCoordinates, endCoordinates, avoidAreas) => {
@@ -55,45 +86,28 @@ class RouteMap extends Component {
   componentDidMount = () => {
     if (this.state.avoidAreaToggle) {
       this.fetchRoute(
-        // "53.457915,-2.226825",
-        // "53.487144,-2.248454",
-        "53.47,-2.24",
-        "53.44,-2.26",
-        `${this.state.rectangle[0][0]},${this.state.rectangle[0][1]};${this.state.rectangle[1][0]},${this.state.rectangle[1][1]}`
+        this.state.startCoordinates,
+        this.state.endCoordinates,
+        this.fetchAvoidString()
       );
     } else {
-      this.fetchRoute("53.457915,-2.226825", "53.487144,-2.248454");
+      this.fetchRoute(this.state.startCoordinates, this.state.endCoordinates);
     }
   };
-
-  fetchAvoidString = () => {};
 
   componentDidUpdate = (prevProps, prevState) => {
     if (prevState.avoidAreaToggle !== this.state.avoidAreaToggle) {
       if (this.state.avoidAreaToggle) {
         this.fetchRoute(
-          "53.47,-2.24",
-          "53.44,-2.26",
-          `${this.state.rectangle[0][0]},${this.state.rectangle[0][1]};${this.state.rectangle[1][0]},${this.state.rectangle[1][1]}`
+          this.state.startCoordinates,
+          this.state.endCoordinates,
+          this.fetchAvoidString()
         );
       } else {
-        this.fetchRoute("53.47,-2.24", "53.44,-2.26");
+        this.fetchRoute(this.state.startCoordinates, this.state.endCoordinates);
       }
     }
   };
-
-  pollutionAreas = pollutionPoints.map(point => {
-    return [
-      [
-        point.pp_coordinates.lat + 0.003 * this.state.pollutionCoeff,
-        point.pp_coordinates.long - 0.005 * this.state.pollutionCoeff
-      ],
-      [
-        point.pp_coordinates.lat - 0.003 * this.state.pollutionCoeff,
-        point.pp_coordinates.long + 0.005 * this.state.pollutionCoeff
-      ]
-    ];
-  });
 
   map = React.createRef();
 
@@ -118,7 +132,7 @@ class RouteMap extends Component {
   };
 
   render() {
-    let centerPosition = this.state.defaultCenter;
+    let centerPosition = this.defaultCenter;
     // const gradient = {
     //   0.1: "#89BDE0",
     //   0.2: "#96E3E6",
@@ -130,11 +144,26 @@ class RouteMap extends Component {
 
     const gradient = { 0.1: "#f3f3f3", 0.5: "#11d3d3", 1: "#1eff00" };
 
+    // console.log(this.avoidString);
+
     const addressPoints = pollutionPoints.map(point => {
       return [point.pp_coordinates.lat, point.pp_coordinates.long, 3000];
     });
 
     // console.log("POLLUTION AREAS => ", this.pollutionAreas);
+    // console.log(this.state.road);
+
+    let road = this.state.road;
+
+    while (road.length > 25) {
+      let mid = 0;
+      if (road.length % 2 === 0) {
+        mid = road.length / 2;
+      } else {
+        mid = (road.length + 1) / 2;
+      }
+      road.splice(mid, 2);
+    }
 
     return (
       !this.state.isLoading && (
@@ -180,11 +209,7 @@ class RouteMap extends Component {
                   ]}
                   color="red"
                 /> */}
-                <RoutingMachine
-                  color="#000"
-                  road={this.state.road}
-                  map={this.map}
-                />
+                <RoutingMachine color="#000" road={road} map={this.map} />
               </div>
             )}
           </Map>
